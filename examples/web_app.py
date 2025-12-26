@@ -156,6 +156,11 @@ def send_command():
             ups.output_reboot(delay)
             return jsonify({"success": True, "message": f"Output Reboot command sent (delay: {delay}s)"})
 
+        # Agent Commands
+        elif cmd == 'restart_card':
+            ups.restart_card()
+            return jsonify({"success": True, "message": "Agent Card restart command sent"})
+
         else:
             return jsonify({"error": "Unknown command"}), 400
     except Exception as e:

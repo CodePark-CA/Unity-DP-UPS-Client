@@ -275,6 +275,23 @@
                         </div>
                     </div>
                 </div>
+
+                <div class="row">
+                    <!-- Agent Info -->
+                    <div class="col-md-12">
+                        <div class="card status-card">
+                            <div class="card-body">
+                                <h5 class="section-header">Agent Information</h5>
+                                <div class="row">
+                                    <div class="col-md-3"><p>Model: <span id="agent_model" class="value-highlight">--</span></p></div>
+                                    <div class="col-md-3"><p>Firmware Version: <span id="agent_fw_version" class="value-highlight">--</span></p></div>
+                                    <div class="col-md-3"><p>Firmware Label: <span id="agent_fw_label" class="value-highlight">--</span></p></div>
+                                    <div class="col-md-3"><p>Agent Date/Time: <span id="agent_date_time" class="value-highlight">--</span></p></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Settings Tab -->
@@ -368,6 +385,18 @@
                         </div>
                     </div>
                 </div>
+
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="card status-card">
+                            <div class="card-header bg-danger text-white">Agent Commands</div>
+                            <div class="card-body">
+                                <button onclick="sendCommand('restart_card')" class="btn btn-danger w-100">Restart Agent Card</button>
+                                <p class="small text-muted mt-2">Note: This will restart the communication card. The UPS output will not be affected, but the web interface will be unavailable for about 60-90 seconds.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -393,6 +422,7 @@
                 const input = data.input.status;
                 const output = data.output.status;
                 const bypass = data.bypass || {};
+                const agent = data.agent ? data.agent.status : {};
 
                 // --- Overview Updates ---
                 const charge = parseInt(battery.charge) || 0;
@@ -455,6 +485,12 @@
                 document.getElementById('bypass_current').innerText = bypass.bypass_current || '--';
                 document.getElementById('bypass_frequency').innerText = bypass.bypass_frequency || '--';
                 document.getElementById('bypass_available').innerText = (bypass.bypass_not_available === "0" ? "Yes" : "No");
+
+                // Agent
+                document.getElementById('agent_model').innerText = agent.model || '--';
+                document.getElementById('agent_fw_version').innerText = agent.firmware_version || '--';
+                document.getElementById('agent_fw_label').innerText = agent.firmware_label || '--';
+                document.getElementById('agent_date_time').innerText = agent.date_time || '--';
 
                 // --- Events Update ---
                 const eventList = document.getElementById('events-list');
