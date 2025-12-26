@@ -25,7 +25,7 @@ class Subsystem:
 
     def get_all(self) -> Dict[str, Any]:
         """Retrieve all defined points in their hierarchical structure."""
-        query = {v: f'vel~pnt~{v[1:]}' for v in self._flat_points.values() if isinstance(v, str) and v.startswith('v')}
+        query = {v: v for v in self._flat_points.values() if isinstance(v, str) and v.startswith('v')}
         data = self._ups.get_data(query, self._dev_id)
         if not data: return {}
 
@@ -45,7 +45,7 @@ class Subsystem:
     def _get_point(self, name: str) -> Any:
         if name in self._flat_points:
             pnt = self._flat_points[name]
-            data = self._ups.get_data({pnt: f'vel~pnt~{pnt[1:]}'}, self._dev_id)
+            data = self._ups.get_data({pnt: pnt}, self._dev_id)
             val = data.get(pnt) if data else None
             if val == 'No Support': val = '--'
             if name in self._processors: val = self._processors[name](val, {})
@@ -190,6 +190,23 @@ class BypassSubsystem(Subsystem):
     bypass_not_available = point_prop('bypass_not_available')
 
 
+class AgentStatus(Subsystem):
+    model = point_prop('model')
+    firmware_version = point_prop('firmware_version')
+    firmware_label = point_prop('firmware_label')
+    date_time = point_prop('date_time')
+
+
+class AgentSubsystem(Subsystem):
+    @property
+    def status(self) -> AgentStatus: return AgentStatus(self._ups, self._mapping['status'], self._dev_id)
+
+    model = point_prop('model')
+    firmware_version = point_prop('firmware_version')
+    firmware_label = point_prop('firmware_label')
+    date_time = point_prop('date_time')
+
+
 class UPSLibrary:
     """Refactored library for interacting with IIS Unity DP UPS."""
     system: SystemSubsystem
@@ -197,6 +214,7 @@ class UPSLibrary:
     input: InputSubsystem
     output: OutputSubsystem
     bypass: BypassSubsystem
+    agent: AgentSubsystem
 
     def __init__(self, host, username, password):
         self.host = host.rstrip('/')
@@ -232,7 +250,7 @@ class UPSLibrary:
                 'site_identifier': 'v4247', 'auto_restart': 'v5831', 'auto_restart_delay': 'v4710',
                 'site_equipment_tag': 'v4248', 'system_name': 'v4246', 'audible_alarm_control': 'v5830'
             }
-        }, processors={'ups_source': proc_source})
+        }, dev_id=0, processors={'ups_source': proc_source})
 
         self.battery = BatterySubsystem(self, {
             'status': {
@@ -241,7 +259,7 @@ class UPSLibrary:
             },
             'event': {'low': 'v4162'},
             'settings': {'low_battery_warning_time': 'v5802'}
-        })
+        }, dev_id=0)
 
         self.input = InputSubsystem(self, {
             'status': {
@@ -249,7 +267,7 @@ class UPSLibrary:
                 'max_voltage_ln': 'v4106', 'min_voltage_ln': 'v4107', 'nominal_voltage': 'v4102'
             },
             'event': {'undervoltage': 'v5568'}
-        })
+        }, dev_id=0)
 
         self.output = OutputSubsystem(self, {
             'status': {
@@ -257,12 +275,18 @@ class UPSLibrary:
                 'load_percent': 'v5861', 'pf': 'v4212', 'frequency': 'v4207'
             },
             'event': {'overload': 'v4215'}
-        }, processors={'pf': proc_pf})
+        }, dev_id=0, processors={'pf': proc_pf})
 
         self.bypass = BypassSubsystem(self, {
             'bypass_voltage': 'v4128', 'bypass_current': 'v5570', 'bypass_frequency': 'v4131',
             'bypass_nominal_voltage': 'v4259', 'bypass_not_available': 'v4135'
-        })
+        }, dev_id=0)
+
+        self.agent = AgentSubsystem(self, {
+            'status': {
+                'model': 'v7421', 'firmware_version': 'v7422', 'firmware_label': 'v7423', 'date_time': 'v16'
+            }
+        }, dev_id=4)
 
     def login(self):
         """Authenticate and get session token."""
@@ -307,12 +331,28 @@ class UPSLibrary:
             logger.error(f"Request error: {e}")
         return None
 
-    def get_data(self, points, devId=0):
+    def get_data(self, points, devId=None):
+        if devId is None: devId = self.devId
         params = {'devId': devId}
-        params.update(points)
+        # Convert v1234 to val1234_0 and value to vel~pnt~1234~0~0
+        for k, v in points.items():
+            pnt_id = k[1:] if k.startswith('v') and k[1:].isdigit() else k
+            params[f"val{pnt_id}_0"] = f"vel~pnt~{pnt_id}~0~0"
+        
         resp = self._request('GET', '/httpGetSet/httpGet.htm', params=params)
-        return {k: v.strip('"') for part in (resp.text.split(';') if resp else []) if '=' in part for k, v in
-                [part.split('=', 1)]}
+        if not resp: return {}
+        
+        # Parse response and normalize keys back to v1234
+        res = {}
+        for part in resp.text.split(';'):
+            if '=' in part:
+                k, v = part.split('=', 1)
+                v = v.strip('"')
+                if k.startswith('val') and k.endswith('_0'):
+                    res[f"v{k[3:-2]}"] = v
+                else:
+                    res[k] = v
+        return res
 
     def set_data(self, points, devId=0):
         for k, v in points.items():
@@ -331,10 +371,13 @@ class UPSLibrary:
 
     # High-level API (Simplified)
     def get_all_status(self):
-        return {s: getattr(self, s).get_all() for s in ['system', 'battery', 'input', 'output', 'bypass']}
+        return {s: getattr(self, s).get_all() for s in ['system', 'battery', 'input', 'output', 'bypass', 'agent']}
 
     def battery_test(self):
         return self.set_data({'v5858': '1!~Start Test'})
+
+    def restart_card(self):
+        return self.set_data({'v139': '1!~Restart Card'}, devId=self.agent._dev_id)
 
     def output_on(self, delay=0):
         return self.set_data({'v5816': f'{delay}!~ON'})
