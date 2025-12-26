@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UPS Advanced Monitor & Control</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .status-card { margin-bottom: 20px; }
+        .value-highlight { font-weight: bold; color: #0d6efd; }
+        #last-updated { font-size: 0.8rem; color: #6c757d; }
+        .section-header { border-bottom: 2px solid #dee2e6; margin-bottom: 15px; padding-bottom: 5px; }
+        .badge-status { font-size: 0.9rem; }
+    </style>
+</head>
+<body class="bg-light">
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container">
+            <span class="navbar-brand mb-0 h1">UPS Advanced Dashboard</span>
+            <div>
+                <span id="last-updated" class="text-light me-3">Connecting...</span>
+                <a href="/logout" class="btn btn-outline-light btn-sm">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- Mimic Diagram -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                        <span>System Mimic Diagram</span>
+                        <div class="legend" style="font-size: 0.8rem;">
+                            <span class="badge" style="background-color: #00ff00; color: black; border: 1px solid #000;">Active</span>
+                            <span class="badge" style="background-color: #808080; border: 1px solid #000;">Inactive</span>
+                        </div>
+                    </div>
+                    <div class="card-body text-center bg-light">
+                        <svg viewBox="0 0 800 450" xmlns="http://www.w3.org/2000/svg" style="max-width: 100%; height: auto;">
+                            <!-- Definitions for markers and filters if needed -->
+                            <defs>
+                                <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+                                    <feDropShadow dx="2" dy="2" stdDeviation="2" flood-opacity="0.3"/>
+                                </filter>
+                            </defs>
+
+                            <!-- Background Lines (Inactive state) -->
+                            <g stroke="#808080" stroke-width="8" fill="none">
+                                <!-- Main Path -->
+                                <path id="path_main_bg" d="M 50 120 L 750 120" />
+                                <!-- Bypass Path -->
+                                <path id="path_bypass_bg" d="M 220 120 L 220 50 L 580 50 L 580 120" />
+                                <!-- Battery Path -->
+                                <path id="path_battery_bg" d="M 400 120 L 400 300" />
+                            </g>
+
+                            <!-- Active Lines (will be colored green when active) -->
+                            <g stroke-width="8" fill="none" stroke-linejoin="round">
+                                <path id="path_input" d="M 50 120 L 220.5 120" stroke="#808080" />
+                                <path id="path_rectifier" d="M 219.5 120 L 400.5 120" stroke="#808080" />
+                                <path id="path_inverter" d="M 399.5 120 L 580.5 120" stroke="#808080" />
+                                <path id="path_output" d="M 579.5 120 L 750 120" stroke="#808080" />
+                                <path id="path_bypass" d="M 220 120 L 220 50 L 580 50 L 580 120" stroke="#808080" />
+                                <path id="path_battery" d="M 400 120 L 400 300" stroke="#808080" />
+                            </g>
+
+                            <!-- Components -->
+                            <!-- Rectifier Box -->
+                            <rect x="330" y="95" width="50" height="50" fill="white" stroke="black" stroke-width="2" filter="url(#shadow)" />
+                            <text x="355" y="125" font-size="12" text-anchor="middle" font-family="Arial">AC/DC</text>
+                            
+                            <!-- Inverter Box -->
+                            <rect x="420" y="95" width="50" height="50" fill="white" stroke="black" stroke-width="2" filter="url(#shadow)" />
+                            <text x="445" y="125" font-size="12" text-anchor="middle" font-family="Arial">DC/AC</text>
+
+                            <!-- Static Gauges / Boxes -->
+                            <!-- Input Info -->
+                            <rect x="50" y="160" width="160" height="100" fill="white" stroke="#ccc" stroke-width="1" rx="5" filter="url(#shadow)" />
+                            <text x="130" y="180" font-size="16" font-weight="bold" fill="#0099cc" text-anchor="middle" font-family="Arial">Input</text>
+                            <text x="60" y="205" font-size="14" font-family="Arial">L-N:</text> <text id="svg_input_v" x="200" y="205" font-size="14" text-anchor="end" font-weight="bold" font-family="Arial">-- V</text>
+                            <text x="60" y="225" font-size="14" font-family="Arial">Amps:</text> <text id="svg_input_a" x="200" y="225" font-size="14" text-anchor="end" font-weight="bold" font-family="Arial">-- A</text>
+                            <text x="60" y="245" font-size="14" font-family="Arial">Freq:</text> <text id="svg_input_f" x="200" y="245" font-size="14" text-anchor="end" font-weight="bold" font-family="Arial">-- Hz</text>
+
+                            <!-- Output Info -->
+                            <rect x="590" y="160" width="160" height="150" fill="white" stroke="#ccc" stroke-width="1" rx="5" filter="url(#shadow)" />
+                            <text x="670" y="180" font-size="16" font-weight="bold" fill="#0099cc" text-anchor="middle" font-family="Arial">Output</text>
+                            <text x="600" y="205" font-size="14" font-family="Arial">L-N:</text> <text id="svg_output_v" x="740" y="205" font-size="14" text-anchor="end" font-weight="bold" font-family="Arial">-- V</text>
+                            <text x="600" y="225" font-size="14" font-family="Arial">Amps:</text> <text id="svg_output_a" x="740" y="225" font-size="14" text-anchor="end" font-weight="bold" font-family="Arial">-- A</text>
+                            <text x="600" y="245" font-size="14" font-family="Arial">Load:</text> <text id="svg_output_load" x="740" y="245" font-size="14" text-anchor="end" font-weight="bold" font-family="Arial">-- %</text>
+                            <text x="600" y="265" font-size="14" font-family="Arial">VA:</text> <text id="svg_output_va" x="740" y="265" font-size="14" text-anchor="end" font-weight="bold" font-family="Arial">--</text>
+                            <text x="600" y="285" font-size="14" font-family="Arial">Watts:</text> <text id="svg_output_w" x="740" y="285" font-size="14" text-anchor="end" font-weight="bold" font-family="Arial">--</text>
+                            <text x="600" y="305" font-size="14" font-family="Arial">Freq:</text> <text id="svg_output_f" x="740" y="305" font-size="14" text-anchor="end" font-weight="bold" font-family="Arial">-- Hz</text>
+
+                            <!-- Battery Info -->
+                            <rect x="300" y="320" width="200" height="100" fill="white" stroke="#ccc" stroke-width="1" rx="5" filter="url(#shadow)" />
+                            <text x="400" y="340" font-size="16" font-weight="bold" fill="#0099cc" text-anchor="middle" font-family="Arial">Battery</text>
+                            <text x="310" y="365" font-size="14" font-family="Arial">Voltage:</text> <text id="svg_batt_v" x="490" y="365" font-size="14" text-anchor="end" font-weight="bold" font-family="Arial">-- V</text>
+                            <text x="310" y="385" font-size="14" font-family="Arial">Charge:</text> <text id="svg_batt_c" x="490" y="385" font-size="14" text-anchor="end" font-weight="bold" font-family="Arial">-- %</text>
+                            <text x="310" y="405" font-size="14" font-family="Arial">Remaining:</text> <text id="svg_batt_t" x="490" y="405" font-size="14" text-anchor="end" font-weight="bold" font-family="Arial">-- min</text>
+
+                            <!-- Small Gauges on lines (like in image) -->
+                            <!-- Input Gauge -->
+                            <g transform="translate(110, 80)">
+                                <circle cx="0" cy="0" r="25" fill="white" stroke="black" stroke-width="1" />
+                                <path d="M -15 10 Q 0 -20 15 10" fill="none" stroke="black" stroke-width="1" />
+                                <line id="gauge_input_needle" x1="0" y1="10" x2="0" y2="-15" stroke="red" stroke-width="2" transform="rotate(-45, 0, 10)" />
+                            </g>
+                            <!-- Output Gauge -->
+                            <g transform="translate(690, 80)">
+                                <circle cx="0" cy="0" r="25" fill="white" stroke="black" stroke-width="1" />
+                                <path d="M -15 10 Q 0 -20 15 10" fill="none" stroke="black" stroke-width="1" />
+                                <line id="gauge_output_needle" x1="0" y1="10" x2="0" y2="-15" stroke="red" stroke-width="2" transform="rotate(-45, 0, 10)" />
+                            </g>
+                            <!-- Battery Gauge -->
+                            <g transform="translate(440, 250)">
+                                <circle cx="0" cy="0" r="25" fill="white" stroke="black" stroke-width="1" />
+                                <path d="M -15 10 Q 0 -20 15 10" fill="none" stroke="black" stroke-width="1" />
+                                <line id="gauge_batt_needle" x1="0" y1="10" x2="0" y2="-15" stroke="red" stroke-width="2" transform="rotate(-45, 0, 10)" />
+                            </g>
+                            
+                            <!-- Symbols -->
+                            <!-- Battery Symbol -->
+                            <g transform="translate(380, 275) scale(0.8)">
+                                <rect x="0" y="0" width="50" height="35" fill="#333" rx="2" />
+                                <rect x="5" y="-5" width="10" height="5" fill="#333" />
+                                <rect x="35" y="-5" width="10" height="5" fill="#333" />
+                                <text x="45" y="12" font-size="12" fill="red" font-weight="bold">+</text>
+                                <text x="5" y="12" font-size="12" fill="white" font-weight="bold">-</text>
+                            </g>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Overview -->
+        <div class="row">
+            <div class="col-md-3">
+                <div class="card status-card text-center">
+                    <div class="card-header bg-success text-white">Battery</div>
+                    <div class="card-body">
+                        <h3 id="battery_charge_text">--%</h3>
+                        <div class="progress mb-2" style="height: 10px;">
+                            <div id="battery_charge_bar" class="progress-bar bg-success" role="progressbar" style="width: 0%;"></div>
+                        </div>
+                        <small id="battery_status_badge" class="badge bg-secondary">--</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card status-card text-center">
+                    <div class="card-header bg-primary text-white">Input</div>
+                    <div class="card-body">
+                        <h3 id="overview_input_v">-- V</h3>
+                        <small id="overview_input_f">-- Hz</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card status-card text-center">
+                    <div class="card-header bg-info text-white">Output</div>
+                    <div class="card-body">
+                        <h3 id="overview_output_v">-- V</h3>
+                        <small id="overview_output_load">-- % Load</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card status-card text-center">
+                    <div class="card-header bg-secondary text-white">Source</div>
+                    <div class="card-body">
+                        <h3 id="overview_ups_source">--</h3>
+                        <small id="overview_ups_topology">--</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Tabs -->
+        <ul class="nav nav-tabs mb-3" id="mainTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="status-tab" data-bs-toggle="tab" data-bs-target="#status" type="button" role="tab">Detailed Status</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="settings-tab" data-bs-toggle="tab" data-bs-target="#settings" type="button" role="tab">Settings</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="commands-tab" data-bs-toggle="tab" data-bs-target="#commands" type="button" role="tab">Commands</button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="mainTabsContent">
+            <!-- Detailed Status Tab -->
+            <div class="tab-pane fade show active" id="status" role="tabpanel">
+                <div class="row">
+                    <!-- System & Input -->
+                    <div class="col-md-6">
+                        <div class="card status-card">
+                            <div class="card-body">
+                                <h5 class="section-header">System Information</h5>
+                                <div class="row">
+                                    <div class="col-6"><p>Model: <span id="model_number" class="value-highlight">--</span></p></div>
+                                    <div class="col-6"><p>Manufacturer: <span id="manufacturer" class="value-highlight">--</span></p></div>
+                                    <div class="col-6"><p>Serial: <span id="serial_number" class="value-highlight">--</span></p></div>
+                                    <div class="col-6"><p>Firmware: <span id="firmware_version" class="value-highlight">--</span></p></div>
+                                    <div class="col-6"><p>Manufacture Date: <span id="manufacture_date" class="value-highlight">--</span></p></div>
+                                    <div class="col-6"><p>Inlet Temp: <span id="inlet_temperature" class="value-highlight">--</span> °C</p></div>
+                                </div>
+
+                                <h5 class="section-header mt-3">Input Status</h5>
+                                <div class="row">
+                                    <div class="col-6"><p>Voltage: <span id="input_voltage" class="value-highlight">--</span> V</p></div>
+                                    <div class="col-6"><p>Frequency: <span id="input_frequency" class="value-highlight">--</span> Hz</p></div>
+                                    <div class="col-6"><p>Max Voltage: <span id="input_max_v" class="value-highlight">--</span> V</p></div>
+                                    <div class="col-6"><p>Min Voltage: <span id="input_min_v" class="value-highlight">--</span> V</p></div>
+                                    <div class="col-6"><p>Current: <span id="input_current" class="value-highlight">--</span> A</p></div>
+                                    <div class="col-6"><p>Nominal V: <span id="input_nom_v" class="value-highlight">--</span> V</p></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Battery & Output -->
+                    <div class="col-md-6">
+                        <div class="card status-card">
+                            <div class="card-body">
+                                <h5 class="section-header">Battery Details</h5>
+                                <div class="row">
+                                    <div class="col-6"><p>Status: <span id="battery_status" class="value-highlight">--</span></p></div>
+                                    <div class="col-6"><p>Charge: <span id="battery_charge_val" class="value-highlight">--</span>%</p></div>
+                                    <div class="col-6"><p>Time Remaining: <span id="battery_time_remaining" class="value-highlight">--</span> min</p></div>
+                                    <div class="col-6"><p>Voltage: <span id="battery_voltage" class="value-highlight">--</span> V</p></div>
+                                    <div class="col-6"><p>Charger State: <span id="battery_charger_state" class="value-highlight">--</span></p></div>
+                                    <div class="col-6"><p>Last Test: <span id="battery_test_result" class="value-highlight">--</span></p></div>
+                                </div>
+
+                                <h5 class="section-header mt-3">Output Status</h5>
+                                <div class="row">
+                                    <div class="col-6"><p>Voltage: <span id="output_voltage" class="value-highlight">--</span> V</p></div>
+                                    <div class="col-6"><p>Frequency: <span id="output_frequency" class="value-highlight">--</span> Hz</p></div>
+                                    <div class="col-6"><p>Load: <span id="output_load" class="value-highlight">--</span> %</p></div>
+                                    <div class="col-6"><p>Power: <span id="output_watts" class="value-highlight">--</span> W</p></div>
+                                    <div class="col-6"><p>Apparent Power: <span id="output_va" class="value-highlight">--</span> VA</p></div>
+                                    <div class="col-6"><p>Power Factor: <span id="output_pf" class="value-highlight">--</span></p></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <!-- Bypass & Events -->
+                    <div class="col-md-12">
+                        <div class="card status-card">
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h5 class="section-header">Bypass Status</h5>
+                                        <div class="row">
+                                            <div class="col-6"><p>Voltage: <span id="bypass_voltage" class="value-highlight">--</span> V</p></div>
+                                            <div class="col-6"><p>Current: <span id="bypass_current" class="value-highlight">--</span> A</p></div>
+                                            <div class="col-6"><p>Frequency: <span id="bypass_frequency" class="value-highlight">--</span> Hz</p></div>
+                                            <div class="col-6"><p>Available: <span id="bypass_available" class="value-highlight">--</span></p></div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h5 class="section-header">Active Alarms / Events</h5>
+                                        <div id="events-list">
+                                            <p class="text-muted">No active events detected.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Tab -->
+            <div class="tab-pane fade" id="settings" role="tabpanel">
+                <div class="card status-card">
+                    <div class="card-body">
+                        <form id="settings-form">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h5 class="section-header">Identification</h5>
+                                    <div class="mb-3">
+                                        <label for="system_name" class="form-label">System Name</label>
+                                        <input type="text" class="form-control" id="system_name">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="site_identifier" class="form-label">Site Identifier</label>
+                                        <input type="text" class="form-control" id="site_identifier" maxlength="32">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="site_equipment_tag" class="form-label">Site Equipment Tag</label>
+                                        <input type="text" class="form-control" id="site_equipment_tag">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <h5 class="section-header">System Behavior</h5>
+                                    <div class="mb-3 form-check">
+                                        <input type="checkbox" class="form-check-input" id="auto_restart">
+                                        <label class="form-check-label" for="auto_restart">Auto Restart</label>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="auto_restart_delay" class="form-label">Auto Restart Delay (sec)</label>
+                                        <input type="number" class="form-control" id="auto_restart_delay">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="low_battery_time" class="form-label">Low Battery Warning Time (min)</label>
+                                        <input type="number" class="form-control" id="low_battery_time" min="2" max="30">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="audible_alarm_control" class="form-label">Audible Alarm Control</label>
+                                        <select class="form-select" id="audible_alarm_control">
+                                            <option value="1">Enable</option>
+                                            <option value="0">Disable</option>
+                                            <option value="2">Mute</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <hr>
+                            <div class="d-flex justify-content-between">
+                                <button type="submit" class="btn btn-primary">Save All Settings</button>
+                                <div id="update-status"></div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Commands Tab -->
+            <div class="tab-pane fade" id="commands" role="tabpanel">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="card status-card">
+                            <div class="card-header bg-danger text-white">System Commands</div>
+                            <div class="card-body">
+                                <button onclick="sendCommand('silence_alarm')" class="btn btn-warning w-100 mb-2">Silence Alarm</button>
+                                <button onclick="sendCommand('abort_command')" class="btn btn-secondary w-100 mb-2">Abort Command</button>
+                                <button onclick="sendCommand('reset_power_stats')" class="btn btn-outline-danger w-100">Reset Power Stats</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card status-card">
+                            <div class="card-header bg-success text-white">Battery Commands</div>
+                            <div class="card-body">
+                                <button onclick="sendCommand('battery_test')" class="btn btn-primary w-100">Run Battery Test</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card status-card border-danger">
+                            <div class="card-header bg-dark text-white">Output Control (Caution!)</div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label for="cmd_delay" class="form-label">Delay (seconds)</label>
+                                    <input type="number" class="form-control" id="cmd_delay" value="0">
+                                </div>
+                                <button onclick="sendDelayedCommand('output_on')" class="btn btn-success w-100 mb-2">Turn Output ON</button>
+                                <button onclick="sendDelayedCommand('output_off')" class="btn btn-danger w-100 mb-2">Turn Output OFF</button>
+                                <button onclick="sendDelayedCommand('output_reboot')" class="btn btn-warning w-100">Reboot Output</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let initialLoad = true;
+
+        async function updateStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                
+                if (data.error) {
+                    document.getElementById('last-updated').innerText = 'Error: ' + data.error;
+                    return;
+                }
+
+                const system = data.system.status;
+                const sys_settings = data.system.settings;
+                const battery = data.battery.status;
+                const batt_settings = data.battery.settings;
+                const input = data.input.status;
+                const output = data.output.status;
+                const bypass = data.bypass || {};
+
+                // --- Overview Updates ---
+                const charge = parseInt(battery.charge) || 0;
+                document.getElementById('battery_charge_text').innerText = charge + '%';
+                const chargeBar = document.getElementById('battery_charge_bar');
+                chargeBar.style.width = charge + '%';
+                
+                const battBadge = document.getElementById('battery_status_badge');
+                battBadge.innerText = battery.status || '--';
+                if (battery.status && battery.status.toLowerCase().includes('normal')) {
+                    battBadge.className = 'badge bg-success';
+                } else if (battery.status && battery.status.toLowerCase().includes('low')) {
+                    battBadge.className = 'badge bg-danger';
+                } else {
+                    battBadge.className = 'badge bg-warning text-dark';
+                }
+
+                document.getElementById('overview_input_v').innerText = (input.voltage_ln || '--') + ' V';
+                document.getElementById('overview_input_f').innerText = (input.frequency_hz && input.frequency_hz !== '--' ? input.frequency_hz + ' Hz' : '--');
+                document.getElementById('overview_output_v').innerText = (output.voltage_ln || '--') + ' V';
+                document.getElementById('overview_output_load').innerText = (output.load_percent || '--') + ' % Load';
+                document.getElementById('overview_ups_source').innerText = system.ups_source || '--';
+                document.getElementById('overview_ups_topology').innerText = system.ups_topology || '--';
+
+                // --- Detailed Status Updates ---
+                // System
+                document.getElementById('model_number').innerText = system.model_number || '--';
+                document.getElementById('manufacturer').innerText = system.manufacturer || '--';
+                document.getElementById('serial_number').innerText = system.serial_number || '--';
+                document.getElementById('firmware_version').innerText = system.firmware_version || '--';
+                document.getElementById('manufacture_date').innerText = system.manufacture_date || '--';
+                document.getElementById('inlet_temperature').innerText = system.inlet_temperature || '--';
+
+                // Input
+                document.getElementById('input_voltage').innerText = input.voltage_ln || '--';
+                document.getElementById('input_frequency').innerText = input.frequency_hz || '--';
+                document.getElementById('input_max_v').innerText = input.max_voltage_ln || '--';
+                document.getElementById('input_min_v').innerText = input.min_voltage_ln || '--';
+                document.getElementById('input_current').innerText = input.current_amps || '--';
+                document.getElementById('input_nom_v').innerText = input.nominal_voltage || '--';
+
+                // Battery
+                document.getElementById('battery_status').innerText = battery.status || '--';
+                document.getElementById('battery_charge_val').innerText = charge;
+                document.getElementById('battery_time_remaining').innerText = battery.time_remaining || '--';
+                document.getElementById('battery_voltage').innerText = battery.dc_bus_voltage || '--';
+                document.getElementById('battery_charger_state').innerText = battery.charger_state || '--';
+                document.getElementById('battery_test_result').innerText = battery.test_result || '--';
+
+                // Output
+                document.getElementById('output_voltage').innerText = output.voltage_ln || '--';
+                document.getElementById('output_frequency').innerText = output.frequency || '--';
+                document.getElementById('output_load').innerText = output.load_percent || '--';
+                document.getElementById('output_watts').innerText = output.watts || '--';
+                document.getElementById('output_va').innerText = output.va || '--';
+                document.getElementById('output_pf').innerText = output.pf || '--';
+
+                // Bypass
+                document.getElementById('bypass_voltage').innerText = bypass.bypass_voltage || '--';
+                document.getElementById('bypass_current').innerText = bypass.bypass_current || '--';
+                document.getElementById('bypass_frequency').innerText = bypass.bypass_frequency || '--';
+                document.getElementById('bypass_available').innerText = (bypass.bypass_not_available === "0" ? "Yes" : "No");
+
+                // --- Events Update ---
+                const eventList = document.getElementById('events-list');
+                let activeEvents = [];
+                
+                // Collect all active events (value != "0" or "Normal")
+                const allSubsystems = ['system', 'battery', 'input', 'output'];
+                allSubsystems.forEach(sub => {
+                    const events = data[sub].events || {};
+                    for (const [key, val] of Object.entries(events)) {
+                        if (val !== "0" && val !== "Normal" && val !== "") {
+                            activeEvents.push({sub, key, val});
+                        }
+                    }
+                });
+
+                if (activeEvents.length > 0) {
+                    eventList.innerHTML = activeEvents.map(e => 
+                        `<div class="alert alert-danger py-1 px-2 mb-1"><strong>${e.sub.toUpperCase()}:</strong> ${e.key.replace(/_/g, ' ')} - ${e.val}</div>`
+                    ).join('');
+                } else {
+                    eventList.innerHTML = '<p class="text-success">No active events detected.</p>';
+                }
+
+                // --- Settings Pre-fill (only on first load) ---
+                if (initialLoad) {
+                    document.getElementById('system_name').value = sys_settings.system_name || '';
+                    document.getElementById('site_identifier').value = sys_settings.site_identifier || '';
+                    document.getElementById('site_equipment_tag').value = sys_settings.site_equipment_tag || '';
+                    document.getElementById('auto_restart').checked = !!sys_settings.auto_restart;
+                    document.getElementById('auto_restart_delay').value = sys_settings.auto_restart_delay || 0;
+                    document.getElementById('low_battery_time').value = batt_settings.low_battery_warning_time || '';
+                    document.getElementById('audible_alarm_control').value = sys_settings.audible_alarm_control || '1';
+                    initialLoad = false;
+                }
+
+                document.getElementById('last-updated').innerText = 'Last Updated: ' + new Date().toLocaleTimeString();
+
+                // --- SVG Mimic Updates ---
+                // Update Numeric Values in SVG
+                document.getElementById('svg_input_v').textContent = (input.voltage_ln || '--') + ' V';
+                document.getElementById('svg_input_a').textContent = (input.current_amps || '--') + ' A';
+                document.getElementById('svg_input_f').textContent = (input.frequency_hz && input.frequency_hz !== '--' ? input.frequency_hz + ' Hz' : '--');
+
+                document.getElementById('svg_output_v').textContent = (output.voltage_ln || '--') + ' V';
+                document.getElementById('svg_output_a').textContent = (output.amps || '--') + ' A';
+                document.getElementById('svg_output_load').textContent = (output.load_percent || '--') + ' %';
+                document.getElementById('svg_output_va').textContent = output.va || '--';
+                document.getElementById('svg_output_w').textContent = output.watts || '--';
+                document.getElementById('svg_output_f').textContent = (output.frequency && output.frequency !== '--' ? output.frequency + ' Hz' : '--');
+
+                document.getElementById('svg_batt_v').textContent = (battery.dc_bus_voltage || '--') + ' V';
+                document.getElementById('svg_batt_c').textContent = (battery.charge || '--') + ' %';
+                document.getElementById('svg_batt_t').textContent = (battery.time_remaining || '--') + ' min';
+
+                // Update Gauge Needles
+                const setNeedle = (id, value, max) => {
+                    const angle = (parseFloat(value) / parseFloat(max)) * 90 - 45;
+                    const needle = document.getElementById(id);
+                    if (needle && !isNaN(angle)) {
+                        needle.setAttribute('transform', `rotate(${Math.min(45, Math.max(-45, angle))}, 0, 10)`);
+                    }
+                };
+                setNeedle('gauge_input_needle', input.voltage_ln, 150);
+                setNeedle('gauge_output_needle', output.load_percent, 100);
+                setNeedle('gauge_batt_needle', battery.charge, 100);
+
+                // Update Line Colors based on source
+                const activeColor = '#00ff00';
+                const inactiveColor = '#808080';
+                
+                // Helper to color a path
+                const colorPath = (id, active) => {
+                    const el = document.getElementById(id);
+                    if (el) el.setAttribute('stroke', active ? activeColor : inactiveColor);
+                };
+
+                const source = (system.ups_source || '').toLowerCase();
+                const isBypass = source.includes('bypass');
+                const onBattery = source.includes('battery');
+                const onUtility = source.includes('utility') || source.includes('rectifier') || source.includes('normal');
+                
+                // Input is active if voltage > 20V
+                const inputActive = parseFloat(input.voltage_ln) > 20;
+                colorPath('path_input', inputActive);
+
+                // Bypass path active if source is bypass
+                colorPath('path_bypass', isBypass);
+
+                // Rectifier path (Input to DC Bus junction) active if input is good and NOT in bypass
+                // We show power going to the DC bus if utility is present and we aren't bypassing everything.
+                colorPath('path_rectifier', inputActive && !isBypass);
+
+                // Battery path active if charging or discharging
+                const batteryDischarging = onBattery;
+                const batteryCharging = battery.charger_state && battery.charger_state.toLowerCase().includes('charge');
+                colorPath('path_battery', batteryDischarging || batteryCharging);
+
+                // Inverter path (DC Bus junction to Bypass return junction) active if source is utility OR battery
+                // This covers the flow from the DC bus (where battery and rectifier meet) to the output.
+                colorPath('path_inverter', (onUtility || onBattery) && !isBypass);
+
+                // Output path active if output voltage is present
+                const outputActive = parseFloat(output.voltage_ln) > 20;
+                colorPath('path_output', outputActive);
+
+            } catch (error) {
+                console.error('Fetch error:', error);
+                document.getElementById('last-updated').innerText = 'Connection Error';
+            }
+        }
+
+        document.getElementById('settings-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const statusDiv = document.getElementById('update-status');
+            statusDiv.innerHTML = '<span class="text-info">Updating...</span>';
+            
+            const payload = {
+                system_name: document.getElementById('system_name').value,
+                site_identifier: document.getElementById('site_identifier').value,
+                site_equipment_tag: document.getElementById('site_equipment_tag').value,
+                auto_restart: document.getElementById('auto_restart').checked,
+                auto_restart_delay: parseInt(document.getElementById('auto_restart_delay').value),
+                low_battery_warning_time: parseInt(document.getElementById('low_battery_time').value),
+                audible_alarm_control: document.getElementById('audible_alarm_control').value
+            };
+
+            try {
+                const response = await fetch('/api/update_settings', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+                if (result.success) {
+                    statusDiv.innerHTML = '<span class="text-success">Settings updated successfully!</span>';
+                    setTimeout(() => statusDiv.innerHTML = '', 3000);
+                } else {
+                    statusDiv.innerHTML = '<span class="text-danger">Error: ' + result.error + '</span>';
+                }
+            } catch (error) {
+                statusDiv.innerHTML = '<span class="text-danger">Connection Error</span>';
+            }
+        };
+
+        async function sendCommand(cmd) {
+            if (!confirm('Are you sure you want to send this command: ' + cmd + '?')) return;
+            try {
+                const response = await fetch('/api/command', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({command: cmd})
+                });
+                const result = await response.json();
+                alert(result.message || result.error);
+            } catch (error) {
+                alert('Command failed');
+            }
+        }
+
+        async function sendDelayedCommand(cmd) {
+            const delay = document.getElementById('cmd_delay').value;
+            if (!confirm(`Are you sure you want to send ${cmd} with ${delay}s delay?`)) return;
+            try {
+                const response = await fetch('/api/command', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({command: cmd, delay: delay})
+                });
+                const result = await response.json();
+                alert(result.message || result.error);
+            } catch (error) {
+                alert('Command failed');
+            }
+        }
+
+        // Poll every 5 seconds
+        setInterval(updateStatus, 5000);
+        updateStatus();
+    </script>
+</body>
+</html>
