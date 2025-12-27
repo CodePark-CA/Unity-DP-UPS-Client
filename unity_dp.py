@@ -208,7 +208,7 @@ class AgentSubsystem(Subsystem):
 
 
 class UPSLibrary:
-    """Refactored library for interacting with IIS Unity DP UPS."""
+    """library for interacting with IS Unity DP UPS."""
     system: SystemSubsystem
     battery: BatterySubsystem
     input: InputSubsystem
